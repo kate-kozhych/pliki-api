@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Text Analysis System</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3148;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; color: #a78bfa; }
+    header span { font-size: 0.85rem; color: #64748b; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0;
+      height: calc(100vh - 57px);
+    }
+
+    /* ── LEFT PANEL ── */
+    .panel-left {
+      background: #13162a;
+      border-right: 1px solid #2d3148;
+      padding: 24px 20px;
+      overflow-y: auto;
+    }
+
+    .panel-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+
+    label { display: block; font-size: 0.82rem; color: #94a3b8; margin-bottom: 4px; }
+
+    .field { margin-bottom: 14px; }
+
+    select, input[type=text], input[type=number] {
+      width: 100%;
+      background: #1e2235;
+      border: 1px solid #2d3148;
+      color: #e2e8f0;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    select:focus, input:focus { border-color: #7c3aed; }
+
+    .range-row { display: flex; align-items: center; gap: 10px; }
+    input[type=range] { flex: 1; accent-color: #7c3aed; }
+    .range-val {
+      background: #1e2235;
+      border: 1px solid #2d3148;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.85rem;
+      min-width: 36px;
+      text-align: center;
+    }
+
+    .checkbox-row { display: flex; align-items: center; gap: 8px; }
+    input[type=checkbox] { accent-color: #7c3aed; width: 14px; height: 14px; }
+
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: background .15s;
+    }
+    .btn:hover { background: #6d28d9; }
+    .btn:disabled { background: #374151; cursor: not-allowed; }
+
+    .msg { margin-top: 12px; font-size: 0.82rem; padding: 8px 10px; border-radius: 6px; }
+    .msg.error { background: #3b1f1f; color: #f87171; border: 1px solid #7f1d1d; }
+    .msg.success { background: #1a2f1a; color: #86efac; border: 1px solid #166534; }
+
+    /* ── RIGHT PANEL ── */
+    .panel-right {
+      padding: 24px 28px;
+      overflow-y: auto;
+    }
+
+    .right-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .btn-sm {
+      padding: 6px 14px;
+      background: #1e2235;
+      border: 1px solid #2d3148;
+      color: #94a3b8;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .btn-sm:hover { border-color: #7c3aed; color: #c4b5fd; }
+
+    #taskList { display: flex; flex-direction: column; gap: 12px; }
+
+    .task-card {
+      background: #13162a;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color .15s;
+    }
+    .task-card:hover { border-color: #4c4f7a; }
+
+    .task-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .task-header:hover { background: #1a1d3a; }
+
+    .task-meta { display: flex; align-items: center; gap: 12px; }
+    .task-type {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #1e2a4a;
+      color: #93c5fd;
+    }
+    .task-id { font-family: monospace; font-size: 0.78rem; color: #4b5563; }
+    .task-path { font-size: 0.8rem; color: #64748b; }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: .05em;
+    }
+    .badge-QUEUED  { background: #1f2937; color: #9ca3af; }
+    .badge-RUNNING { background: #1c3449; color: #38bdf8; animation: pulse 1.2s infinite; }
+    .badge-DONE    { background: #14291c; color: #4ade80; }
+    .badge-FAILED  { background: #2d1515; color: #f87171; }
+
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.55 } }
+
+    .task-body {
+      display: none;
+      padding: 0 16px 16px;
+      border-top: 1px solid #1e2235;
+    }
+    .task-body.open { display: block; }
+
+    .result-block { margin-top: 14px; }
+    .result-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .07em; color: #4b5563; margin-bottom: 6px; }
+    .result-value { font-size: 1.6rem; font-weight: 700; color: #a78bfa; }
+
+    .top-words { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .word-pill {
+      background: #1e2235;
+      border: 1px solid #2d3148;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .word-pill .wcount { color: #7c3aed; font-weight: 600; }
+
+    .bench-wrap { margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th {
+      background: #1e2235;
+      color: #64748b;
+      font-size: 0.72rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 7px 10px;
+      text-align: right;
+    }
+    th:first-child { text-align: left; }
+    td {
+      padding: 6px 10px;
+      text-align: right;
+      border-top: 1px solid #1a1d2e;
+    }
+    td:first-child { text-align: left; color: #94a3b8; }
+    tr.seq-row td { color: #f59e0b; }
+
+    .error-msg { margin-top: 12px; font-size: 0.84rem; color: #f87171; background: #2d1515; padding: 8px 10px; border-radius: 5px; }
+
+    .empty { text-align: center; padding: 60px 0; color: #4b5563; font-size: 0.9rem; }
+
+    .chevron { transition: transform .2s; font-size: 0.85rem; color: #4b5563; }
+    .chevron.open { transform: rotate(180deg); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Text Analysis System</h1>
+  <span>Parallel &amp; Sequential Benchmark · Spring Boot REST API</span>
+</header>
+
+<div class="layout">
+  <!-- LEFT: form -->
+  <aside class="panel-left">
+    <p class="panel-title">New Task</p>
+
+    <div class="field">
+      <label>Input Path (directory)</label>
+      <input type="text" id="inputPath" value="texts/" placeholder="texts/"/>
+    </div>
+
+    <div class="field">
+      <label>Workers (parallel threads)</label>
+      <div class="range-row">
+        <input type="range" id="workers" min="1" max="16" value="4"
+               oninput="document.getElementById('workersVal').textContent=this.value"/>
+        <span class="range-val" id="workersVal">4</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="checkbox-row">
+        <input type="checkbox" id="runBenchmark" checked/>
+        <label style="margin-bottom:0">Run full benchmark (1/2/4/8 workers × 5 runs)</label>
+      </div>
+    </div>
+
+    <button class="btn" id="submitBtn" onclick="submitTask()">▶ Submit Task</button>
+    <div id="submitMsg"></div>
+  </aside>
+
+  <!-- RIGHT: task list -->
+  <main class="panel-right">
+    <div class="right-header">
+      <p class="panel-title" style="margin-bottom:0">Task History</p>
+      <button class="btn-sm" onclick="loadTasks()">↻ Refresh</button>
+    </div>
+    <div id="taskList"><p class="empty">No tasks yet. Submit one on the left.</p></div>
+  </main>
+</div>
+
+<script>
+  const API = '';
+
+  async function submitTask() {
+    const btn = document.getElementById('submitBtn');
+    const msgEl = document.getElementById('submitMsg');
+
+    const body = {
+      taskType: 'TOTAL_WORDS',
+      inputPath: document.getElementById('inputPath').value.trim() || 'texts/',
+      workers: parseInt(document.getElementById('workers').value),
+      runBenchmark: document.getElementById('runBenchmark').checked
+    };
+
+    btn.disabled = true;
+    msgEl.innerHTML = '';
+
+    try {
+      const res = await fetch(`${API}/tasks`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || res.statusText);
+
+      msgEl.innerHTML = `<div class="msg success">Task queued — ID: <code>${data.taskId.slice(0,8)}…</code></div>`;
+      loadTasks();
+      startPolling(data.taskId);
+    } catch (e) {
+      msgEl.innerHTML = `<div class="msg error">Error: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  const pollingMap = {};
+
+  function startPolling(taskId) {
+    if (pollingMap[taskId]) return;
+    pollingMap[taskId] = setInterval(async () => {
+      const res = await fetch(`${API}/tasks/${taskId}`);
+      const data = await res.json();
+      renderOrUpdateCard(data);
+      if (data.status === 'DONE' || data.status === 'FAILED') {
+        clearInterval(pollingMap[taskId]);
+        delete pollingMap[taskId];
+      }
+    }, 1500);
+  }
+
+  async function loadTasks() {
+    const res = await fetch(`${API}/tasks`);
+    const tasks = await res.json();
+    const list = document.getElementById('taskList');
+
+    if (!tasks.length) {
+      list.innerHTML = '<p class="empty">No tasks yet. Submit one on the left.</p>';
+      return;
+    }
+    // render all; keep existing expansions
+    tasks.forEach(t => renderOrUpdateCard(t));
+
+    // start polling for unfinished tasks
+    tasks.filter(t => t.status === 'QUEUED' || t.status === 'RUNNING')
+         .forEach(t => startPolling(t.taskId));
+  }
+
+  function renderOrUpdateCard(task) {
+    const list = document.getElementById('taskList');
+    // clear empty state
+    if (list.querySelector('.empty')) list.innerHTML = '';
+
+    const existing = document.getElementById(`card-${task.taskId}`);
+    const html = buildCard(task);
+    if (existing) {
+      const wasOpen = existing.querySelector('.task-body.open') !== null;
+      existing.outerHTML = html;
+      if (wasOpen) {
+        const newCard = document.getElementById(`card-${task.taskId}`);
+        newCard.querySelector('.task-body').classList.add('open');
+        newCard.querySelector('.chevron').classList.add('open');
+      }
+    } else {
+      list.insertAdjacentHTML('afterbegin', html);
+    }
+  }
+
+  function toggleCard(taskId) {
+    const card = document.getElementById(`card-${taskId}`);
+    const body = card.querySelector('.task-body');
+    const chev = card.querySelector('.chevron');
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+  }
+
+  function buildCard(t) {
+    const typeLabel = t.taskType.replace('_', ' ');
+    const time = t.createdAt ? new Date(t.createdAt).toLocaleTimeString() : '';
+    const dur = (t.createdAt && t.completedAt)
+        ? `${((new Date(t.completedAt) - new Date(t.createdAt)) / 1000).toFixed(1)}s`
+        : '';
+
+    let resultHtml = '';
+    if (t.status === 'DONE') {
+      const val = t.result !== null && t.result !== undefined
+          ? Number(t.result).toLocaleString()
+          : '—';
+      resultHtml = `<div class="result-block">
+        <div class="result-label">Total words</div>
+        <div class="result-value">${val}</div>
+      </div>`;
+    }
+    if (t.status === 'FAILED') {
+      resultHtml = `<div class="error-msg">✗ ${t.errorMessage || 'Unknown error'}</div>`;
+    }
+
+    let benchHtml = '';
+    if (t.benchmarkResult) {
+      const b = t.benchmarkResult;
+      const rows = Object.entries(b.parallelTimesMs || {}).map(([w, ms]) => {
+        const s = (b.speedup?.[w] ?? 0).toFixed(2);
+        const e = (b.efficiency?.[w] ?? 0).toFixed(2);
+        return `<tr>
+          <td>${w} worker${w > 1 ? 's' : ''}</td>
+          <td>${ms} ms</td>
+          <td>${s}×</td>
+          <td>${e}</td>
+        </tr>`;
+      }).join('');
+
+      benchHtml = `<div class="bench-wrap">
+        <div class="result-label" style="margin-top:16px">Benchmark (avg of 5 runs, 2 warmup)</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Mode</th>
+              <th>Avg Time</th>
+              <th>S(N) = T₁/Tₙ</th>
+              <th>E(N) = S(N)/N</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="seq-row">
+              <td>Sequential</td>
+              <td>${b.sequentialTimeMs} ms</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+            ${rows}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    return `
+    <div class="task-card" id="card-${t.taskId}">
+      <div class="task-header" onclick="toggleCard('${t.taskId}')">
+        <div class="task-meta">
+          <span class="task-type">${typeLabel}</span>
+          <span class="task-id">${t.taskId.slice(0, 8)}…</span>
+          <span class="task-path">${t.inputPath} · ${t.workers}w</span>
+          ${dur ? `<span style="font-size:0.78rem;color:#4b5563">${dur}</span>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge badge-${t.status}">${t.status}</span>
+          <span class="chevron">▾</span>
+        </div>
+      </div>
+      <div class="task-body">
+        ${resultHtml}
+        ${benchHtml}
+      </div>
+    </div>`;
+  }
+
+  // initial load
+  loadTasks();
+</script>
+</body>
+</html>
