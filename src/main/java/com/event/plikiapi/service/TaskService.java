@@ -2,6 +2,7 @@ package com.event.plikiapi.service;
 
 import com.event.plikiapi.analyzer.TextAnalyzer;
 import com.event.plikiapi.analyzer.TotalWordsAnalyzer;
+import com.event.plikiapi.analyzer.UniqueWordsAnalyzer;
 import com.event.plikiapi.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class TaskService {
     private static final int BENCHMARK_RUNS = 5;
 
     private final TotalWordsAnalyzer totalWordsAnalyzer;
+    private final UniqueWordsAnalyzer uniqueWordsAnalyzer;
 
     private final ConcurrentHashMap<UUID, Task> store = new ConcurrentHashMap<>();
     private final ExecutorService taskExecutor = Executors.newFixedThreadPool(4);
@@ -132,6 +134,7 @@ public class TaskService {
     private TextAnalyzer resolveAnalyzer(TaskType type) {
         return switch (type) {
             case TOTAL_WORDS -> totalWordsAnalyzer;
+            case UNIQUE_WORDS -> uniqueWordsAnalyzer;
         };
     }
 
