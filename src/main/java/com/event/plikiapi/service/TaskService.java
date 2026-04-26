@@ -1,6 +1,7 @@
 package com.event.plikiapi.service;
 
 import com.event.plikiapi.analyzer.TextAnalyzer;
+import com.event.plikiapi.analyzer.TopWordsAnalyzer;
 import com.event.plikiapi.analyzer.TotalWordsAnalyzer;
 import com.event.plikiapi.analyzer.UniqueWordsAnalyzer;
 import com.event.plikiapi.model.*;
@@ -25,12 +26,13 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class TaskService {
 
-    private static final int[] WORKER_COUNTS = {1, 2, 4, 8};
+    private static final int[] WORKER_COUNTS = { 1, 2, 4, 8 };
     private static final int WARMUP_RUNS = 2;
     private static final int BENCHMARK_RUNS = 5;
 
     private final TotalWordsAnalyzer totalWordsAnalyzer;
     private final UniqueWordsAnalyzer uniqueWordsAnalyzer;
+    private final TopWordsAnalyzer topWordsAnalyzer;
 
     private final ConcurrentHashMap<UUID, Task> store = new ConcurrentHashMap<>();
     private final ExecutorService taskExecutor = Executors.newFixedThreadPool(4);
@@ -41,8 +43,7 @@ public class TaskService {
                 request.getTaskType(),
                 request.getInputPath(),
                 request.getWorkers(),
-                request.isRunBenchmark()
-        );
+                request.isRunBenchmark());
         store.put(task.getTaskId(), task);
         taskExecutor.submit(() -> execute(task));
         log.info("Task {} queued: {} on '{}'", task.getTaskId(), task.getTaskType(), task.getInputPath());
@@ -135,6 +136,7 @@ public class TaskService {
         return switch (type) {
             case TOTAL_WORDS -> totalWordsAnalyzer;
             case UNIQUE_WORDS -> uniqueWordsAnalyzer;
+            case TOP_WORDS -> topWordsAnalyzer;
         };
     }
 

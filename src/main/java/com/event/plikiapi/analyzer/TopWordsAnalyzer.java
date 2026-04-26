@@ -1,81 +1,86 @@
 package com.event.plikiapi.analyzer;
 
-import com.event.plikiapi.model.TopWordsResult;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-@Service
+@Component
 public class TopWordsAnalyzer implements TextAnalyzer {
 
     private static final int TOP_N = 10;
 
     @Override
-    public Object analyzeSequential(List<Path> files) {
-        long startTime = System.currentTimeMillis();
+    public Map<String, Long> analyzeSequential(List<Path> files) throws Exception {
         Map<String, Long> totalCounts = new HashMap<>();
 
         for (Path file : files) {
-            try (Stream<String> lines = Files.lines(file)) {
-                lines.flatMap(line -> Arrays.stream(line.toLowerCase().split("\\W+")))
-                        .filter(word -> !word.isEmpty())
-                        .forEach(word -> totalCounts.merge(word, 1L, Long::sum));
-            } catch (IOException e) {
-                System.err.println("Reading file error: " + file.getFileName());
-            }
+            countWordsSequential(file, totalCounts);
         }
 
-        Map<String, Long> sortedTopWords = getTopN(totalCounts, TOP_N);
-        long endTime = System.currentTimeMillis();
-
-        return new TopWordsResult(sortedTopWords, (endTime - startTime));
+        return getTopN(totalCounts, TOP_N);
     }
 
     @Override
-    public Object analyzeParallel(List<Path> files, int workers) {
-        long startTime = System.currentTimeMillis();
+    public Map<String, Long> analyzeParallel(List<Path> files, int workers) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(workers);
         ConcurrentHashMap<String, LongAdder> concurrentCounts = new ConcurrentHashMap<>();
 
-        List<Callable<Void>> tasks = new ArrayList<>();
-        for (Path file : files) {
-            tasks.add(() -> {
-                try (Stream<String> lines = Files.lines(file)) {
-                    lines.flatMap(line -> Arrays.stream(line.toLowerCase().split("\\W+")))
-                            .filter(word -> !word.isEmpty())
-                            .forEach(word -> concurrentCounts
-                                    .computeIfAbsent(word, k -> new LongAdder())
-                                    .increment());
-                } catch (IOException e) {
-                    System.err.println("Reading file error: " + file.getFileName());
-                }
-                return null;
-            });
-        }
-
         try {
-            executor.invokeAll(tasks);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Parallel execution was interrupted", e);
+            List<Future<Void>> futures = new ArrayList<>();
+            for (Path file : files) {
+                futures.add(executor.submit(() -> {
+                    countWordsParallel(file, concurrentCounts);
+                    return null;
+                }));
+            }
+
+            for (Future<Void> future : futures) {
+                future.get();
+            }
+
+            Map<String, Long> finalCounts = new HashMap<>();
+            concurrentCounts.forEach((k, v) -> finalCounts.put(k, v.sum()));
+
+            return getTopN(finalCounts, TOP_N);
         } finally {
             executor.shutdown();
         }
+    }
 
-        Map<String, Long> finalCounts = new HashMap<>();
-        concurrentCounts.forEach((k, v) -> finalCounts.put(k, v.sum()));
+    private void countWordsSequential(Path file, Map<String, Long> counts) throws IOException {
+        String content = Files.readString(file);
+        if (content.isBlank())
+            return;
 
-        Map<String, Long> sortedTopWords = getTopN(finalCounts, TOP_N);
-        long endTime = System.currentTimeMillis();
+        String[] tokens = content.trim().toLowerCase().split("\\W+");
+        for (String word : tokens) {
+            if (!word.isEmpty()) {
+                counts.put(word, counts.getOrDefault(word, 0L) + 1L);
+            }
+        }
+    }
 
-        return new TopWordsResult(sortedTopWords, (endTime - startTime));
+    private void countWordsParallel(Path file, ConcurrentHashMap<String, LongAdder> concurrentCounts)
+            throws IOException {
+        String content = Files.readString(file);
+        if (content.isBlank())
+            return;
+
+        String[] tokens = content.trim().toLowerCase().split("\\W+");
+        for (String word : tokens) {
+            if (!word.isEmpty()) {
+                concurrentCounts.computeIfAbsent(word, k -> new LongAdder()).increment();
+            }
+        }
     }
 
     private Map<String, Long> getTopN(Map<String, Long> counts, int n) {
@@ -85,7 +90,7 @@ public class TopWordsAnalyzer implements TextAnalyzer {
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue,
-                        (Long e1, Long e2) -> e1,
+                        (e1, e2) -> e1,
                         LinkedHashMap::new));
     }
 }
