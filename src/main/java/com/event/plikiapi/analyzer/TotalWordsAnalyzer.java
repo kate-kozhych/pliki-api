@@ -44,7 +44,7 @@ public class TotalWordsAnalyzer implements TextAnalyzer {
     private long countWords(Path file) throws IOException {
         String content = Files.readString(file);
         if (content.isBlank()) return 0;
-        String[] tokens = content.trim().split("\\s+"); // \\s+ one or more whitespace characters (space, tab, newline, etc.)
+        String[] tokens = content.trim().split("\\s+");
         return tokens.length;
     }
 }

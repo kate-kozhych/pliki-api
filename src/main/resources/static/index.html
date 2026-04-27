@@ -239,6 +239,15 @@
     <p class="panel-title">New Task</p>
 
     <div class="field">
+      <label>Task Type</label>
+      <select id="taskType" onchange="onTypeChange()">
+        <option value="TOTAL_WORDS">Total Words</option>
+        <option value="UNIQUE_WORDS">Unique Words</option>
+        <option value="TOP_WORDS">Top Words (top 10)</option>
+      </select>
+    </div>
+
+    <div class="field">
       <label>Input Path (directory)</label>
       <input type="text" id="inputPath" value="texts/" placeholder="texts/"/>
     </div>
@@ -276,12 +285,18 @@
 <script>
   const API = '';
 
+  function onTypeChange() {
+    const type = document.getElementById('taskType').value;
+    document.getElementById('taskType').style.borderColor =
+        type === 'TOTAL_WORDS' ? '#7c3aed' : type === 'UNIQUE_WORDS' ? '#0ea5e9' : '#f59e0b';
+  }
+
   async function submitTask() {
     const btn = document.getElementById('submitBtn');
     const msgEl = document.getElementById('submitMsg');
 
     const body = {
-      taskType: 'TOTAL_WORDS',
+      taskType: document.getElementById('taskType').value,
       inputPath: document.getElementById('inputPath').value.trim() || 'texts/',
       workers: parseInt(document.getElementById('workers').value),
       runBenchmark: document.getElementById('runBenchmark').checked
@@ -378,13 +393,22 @@
 
     let resultHtml = '';
     if (t.status === 'DONE') {
-      const val = t.result !== null && t.result !== undefined
-          ? Number(t.result).toLocaleString()
-          : '—';
-      resultHtml = `<div class="result-block">
-        <div class="result-label">Total words</div>
-        <div class="result-value">${val}</div>
-      </div>`;
+      if (t.taskType === 'TOP_WORDS' && t.result && typeof t.result === 'object') {
+        const pills = Object.entries(t.result)
+            .map(([w, c]) => `<span class="word-pill">${w} <span class="wcount">${Number(c).toLocaleString()}</span></span>`)
+            .join('');
+        resultHtml = `<div class="result-block">
+          <div class="result-label">Top ${Object.keys(t.result).length} words</div>
+          <div class="top-words">${pills}</div>
+        </div>`;
+      } else {
+        const label = t.taskType === 'UNIQUE_WORDS' ? 'Unique words' : 'Total words';
+        const val = t.result !== null && t.result !== undefined ? Number(t.result).toLocaleString() : '—';
+        resultHtml = `<div class="result-block">
+          <div class="result-label">${label}</div>
+          <div class="result-value">${val}</div>
+        </div>`;
+      }
     }
     if (t.status === 'FAILED') {
       resultHtml = `<div class="error-msg">✗ ${t.errorMessage || 'Unknown error'}</div>`;
